@@ -1,7 +1,7 @@
 package set_example
 
 import (
-	string_set "github.com/sridharv/stencil/collections/set/Element/string"
+	string_set "github.com/sridharv/stencil/std/set/Element/string"
 )
 
 func Common(list1, list2 []string) []string {
