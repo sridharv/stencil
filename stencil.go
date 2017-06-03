@@ -20,6 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/vcs"
 	"golang.org/x/tools/imports"
 )
 
@@ -115,7 +116,7 @@ func process(paths []string, mkdir func(string, os.FileMode) error, write func(s
 	var files []file
 	filer := func(f file) { files = append(files, f) }
 	for _, pkg := range pkgs {
-		if err := processPackage(p, pkg, filer, pkgMap[pkg.Pkg.Path()]); err != nil {
+		if err := processPackage(pkg, filer, pkgMap[pkg.Pkg.Path()], getVendor(p, pkg)); err != nil {
 			return err
 		}
 	}
@@ -176,7 +177,25 @@ func (r replacer) filterTypeDecls(name string) bool {
 	return !present
 }
 
-func processPackage(p *loader.Program, pkg *loader.PackageInfo, add func(file), files map[string]struct{}) error {
+func getVendor(p *loader.Program, pkg *loader.PackageInfo) string {
+	src := p.Fset.File(pkg.Files[0].Pos()).Name()
+	base := filepath.Clean(filepath.Dir(src))
+
+	r, err := vcs.RepoRootForImportPath(pkg.Pkg.Path(), false)
+	if err != nil {
+		return filepath.Join(base, "vendor")
+	}
+	root := filepath.Clean(r.Root)
+	for dir := base; dir != root; dir = filepath.Dir(dir) {
+		v := filepath.Join(dir, "vendor")
+		if s, err := os.Stat(v); err == nil && s.IsDir() {
+			return v
+		}
+	}
+	return filepath.Join(base, "vendor")
+}
+
+func processPackage(pkg *loader.PackageInfo, add func(file), files map[string]struct{}, vendor string) error {
 	pos := posMap{}
 	for _, err := range pkg.Errors {
 		if terr, ok := err.(types.Error); ok && strings.Contains(terr.Error(), "could not import") {
@@ -190,8 +209,6 @@ func processPackage(p *loader.Program, pkg *loader.PackageInfo, add func(file), 
 		}
 	}
 
-	src := p.Fset.File(pkg.Files[0].Pos()).Name()
-	base := filepath.Join(filepath.Dir(src), "vendor")
 	for _, str := range pos {
 		if str == "" {
 			continue
@@ -201,7 +218,7 @@ func processPackage(p *loader.Program, pkg *loader.PackageInfo, add func(file), 
 			return errors.Errorf("found invalid import path: %s", str)
 		}
 		path := str[1 : l-1]
-		if err := substituteIfNeeded(base, path, add); err != nil {
+		if err := substituteIfNeeded(vendor, path, add); err != nil {
 			return err
 		}
 	}
