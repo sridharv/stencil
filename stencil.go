@@ -129,6 +129,29 @@ func process(paths []string, mkdir func(string, os.FileMode) error, write func(s
 			return errors.WithStack(err)
 		}
 	}
+	return doImports(paths)
+}
+
+func doImports(paths []string) error {
+	for _, p := range paths {
+		s, err := os.Stat(p)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if s.IsDir() {
+			continue
+		}
+		b, err := ioutil.ReadFile(p)
+		if err != nil {
+			return errors.Wrapf(err, "%s", p)
+		}
+		if b, err = imports.Process(p, b, nil); err != nil {
+			return errors.Wrapf(err, "%s", p)
+		}
+		if err = ioutil.WriteFile(p, b, s.Mode()); err != nil {
+			return errors.Wrapf(err, "failed to write %s", p)
+		}
+	}
 	return nil
 }
 
