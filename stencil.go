@@ -18,8 +18,6 @@ import (
 
 	"go/build"
 
-	"fmt"
-
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/vcs"
@@ -82,50 +80,6 @@ func Process(paths []string, format bool) error {
 	return doImports(paths)
 }
 
-func listPackages(paths []string) (map[string]map[string]struct{}, error) {
-	dirs := build.Default.SrcDirs()
-
-	if len(paths) == 0 {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		paths = append(paths, dir)
-		fmt.Println(dir)
-	}
-
-	pkgs := map[string]map[string]struct{}{}
-	for _, path := range paths {
-		var trimmed string
-		for _, dir := range dirs {
-			if strings.HasPrefix(path, dir) {
-				trimmed = strings.TrimPrefix(path, dir)
-				break
-			}
-		}
-		var name string
-		if strings.HasSuffix(trimmed, ".go") {
-			name = filepath.Base(name)
-			trimmed = filepath.Dir(trimmed)
-		}
-		if trimmed == "" {
-			return nil, errors.Errorf("%s: not in GOPATH", path)
-		}
-		pkg := trimmed[1:]
-		existing := pkgs[pkg]
-		switch {
-		case name == "" || name == ".":
-			pkgs[pkg] = map[string]struct{}{}
-		case len(existing) == 0 && existing != nil:
-		case existing != nil:
-			existing[name] = struct{}{}
-		default:
-			pkgs[pkg] = map[string]struct{}{name: {}}
-		}
-	}
-	return pkgs, nil
-}
-
 func loadConfig(paths []string) (*loader.Program, error) {
 	dirs := build.Default.SrcDirs()
 	getPackage := func(p string) string {
@@ -171,15 +125,6 @@ func loadConfig(paths []string) (*loader.Program, error) {
 }
 
 func process(paths []string) ([]file, error) {
-
-	//pkgMap, err := listPackages(paths)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//cfg := makeConfig()
-	//for pkg, _ := range pkgMap {
-	//	cfg.Import(pkg)
-	//}
 	p, err := loadConfig(paths)
 	if err != nil {
 		return nil, errors.WithStack(err)
