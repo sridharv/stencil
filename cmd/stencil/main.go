@@ -6,6 +6,8 @@ import (
 
 	"path/filepath"
 
+	"flag"
+
 	"github.com/sridharv/stencil"
 )
 
@@ -15,13 +17,17 @@ func usage() {
 }
 
 func main() {
-	if len(os.Args) == 1 {
-		usage()
+	var w bool
+	flag.BoolVar(&w, "w", false, "If true, the input files are overwritten after formatting")
+
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage:")
+		fmt.Fprintln(os.Stderr, "stencil [-w] [path...]")
+		flag.PrintDefaults()
 	}
-	if os.Args[1] != "-w" {
-		usage()
-	}
-	if err := stencil.Process(os.Args[2:]); err != nil {
+	flag.Parse()
+
+	if err := stencil.Process(flag.Args(), w); err != nil {
 		fmt.Fprintf(os.Stderr, "%+v\n", err)
 		return
 	}

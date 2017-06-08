@@ -1,7 +1,6 @@
 package stencil
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -11,17 +10,27 @@ import (
 
 	"bytes"
 
+	"os"
+
+	"strings"
+
+	"github.com/pkg/errors"
 	"github.com/sridharv/fakegopath"
 )
 
 var updateGoldens = flag.Bool("update-goldens", false, "If true, goldens are updated")
 
+type outFile struct {
+	path   string
+	golden string
+}
+
 type testCase struct {
-	name     string
-	files    []fakegopath.SourceFile
-	srcs     []string
-	outfile  string
-	expected string
+	name    string
+	files   []fakegopath.SourceFile
+	srcs    []string
+	outs    []outFile
+	process func([]string) ([]file, error)
 }
 
 func (c testCase) run(t *testing.T) {
@@ -32,48 +41,37 @@ func (c testCase) run(t *testing.T) {
 		}
 		defer tmp.Reset()
 
-		var dir string
-		var f file
-		mkdir := func(d string, p os.FileMode) error {
-			if p != 0755 {
-				t.Errorf("invalid filemode for dir: %v", p)
-			}
-			dir = d
-			return nil
-		}
-		write := func(path string, data []byte, p os.FileMode) error {
-			if p != 0644 {
-				t.Errorf("invalid filemode for file: %v", p)
-			}
-			f.path, f.data = path, data
-			return nil
-		}
 		srcs := make([]string, len(c.srcs))
 		for i, s := range c.srcs {
 			srcs[i] = filepath.Join(tmp.Src, s)
 		}
-		if err := process(srcs, mkdir, write); err != nil {
+		proc := c.process
+		if proc == nil {
+			proc = process
+		}
+		files, err := proc(srcs)
+		if err != nil {
 			t.Fatalf("%+v", err)
 		}
-		out := filepath.Join(tmp.Src, c.outfile)
-		if dir != filepath.Dir(out) {
-			t.Errorf("expected dir %s, got %s", filepath.Dir(out), dir)
-		}
-		if f.path != out {
-			t.Errorf("expected file %s, got %s", out, f.path)
-		}
-		if *updateGoldens {
-			if err := ioutil.WriteFile(c.expected, f.data, 0644); err != nil {
-				t.Fatal(c.expected, ": failed to update golden", err)
+		for i, o := range c.outs {
+			out := filepath.Join(tmp.Src, o.path)
+			f := files[i]
+			if !strings.HasSuffix(f.path, out) {
+				t.Errorf("expected file %s, got %s", out, f.path)
 			}
-			return
-		}
-		golden, err := ioutil.ReadFile(c.expected)
-		if err != nil {
-			t.Fatal(c.expected, ": could not read golden", err)
-		}
-		if !bytes.Equal(golden, f.data) {
-			t.Errorf("expected output:\n%s\ngot:\n%s", string(golden), string(f.data))
+			if *updateGoldens {
+				if err := ioutil.WriteFile(o.golden, f.data, 0644); err != nil {
+					t.Error(o.golden, ": failed to update golden", err)
+				}
+				continue
+			}
+			golden, err := ioutil.ReadFile(o.golden)
+			if err != nil {
+				t.Fatal(o.golden, ": could not read golden", err)
+			}
+			if !bytes.Equal(golden, f.data) {
+				t.Errorf("expected output:\n%s\ngot:\n%s", string(golden), string(f.data))
+			}
 		}
 	})
 }
@@ -85,9 +83,39 @@ var cases = []testCase{
 			{Src: "testdata/set.go", Dest: "collections/set/set.go"},
 			{Src: "testdata/set.intersect.go", Dest: "examples/setexamples/intersect.go"},
 		},
-		srcs:     []string{"examples/setexamples/intersect.go"},
-		outfile:  "examples/setexamples/vendor/collections/set/Element/string/set.go",
-		expected: "testdata/set.string.golden",
+		srcs: []string{"examples/setexamples/intersect.go"},
+		outs: []outFile{
+			{
+				path:   "examples/setexamples/vendor/collections/set/Element/string/set.go",
+				golden: "testdata/set.string.golden",
+			},
+		},
+	},
+	{
+		name: "Set_String_Dir",
+		files: []fakegopath.SourceFile{
+			{Src: "testdata/set.go", Dest: "collections/set/set.go"},
+			{Src: "testdata/set.intersect.go", Dest: "examples/setexamples/intersect.go"},
+		},
+		srcs: []string{"examples/setexamples/intersect.go"},
+		outs: []outFile{
+			{
+				path:   "examples/setexamples/vendor/collections/set/Element/string/set.go",
+				golden: "testdata/set.string.golden",
+			},
+		},
+		process: func(p []string) ([]file, error) {
+			d := filepath.Dir(p[0])
+			cwd, err := os.Getwd()
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+			if err = os.Chdir(d); err != nil {
+				return nil, errors.WithStack(err)
+			}
+			defer os.Chdir(cwd)
+			return process([]string{})
+		},
 	},
 }
 

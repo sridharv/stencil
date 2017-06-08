@@ -18,6 +18,8 @@ import (
 
 	"go/build"
 
+	"fmt"
+
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/vcs"
@@ -59,12 +61,38 @@ func makeConfig() *loader.Config {
 }
 
 // Process process paths, generating vendored, specialized code for any stencil import paths
-func Process(paths []string) error {
-	return process(paths, os.MkdirAll, ioutil.WriteFile)
+func Process(paths []string, format bool) error {
+	files, err := process(paths)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		dir := filepath.Dir(f.path)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return errors.WithStack(err)
+		}
+		if err := ioutil.WriteFile(f.path, f.data, 0644); err != nil {
+			return errors.WithStack(err)
+		}
+	}
+	if !format {
+		return nil
+	}
+	return doImports(paths)
 }
 
 func listPackages(paths []string) (map[string]map[string]struct{}, error) {
 	dirs := build.Default.SrcDirs()
+
+	if len(paths) == 0 {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		paths = append(paths, dir)
+		fmt.Println(dir)
+	}
 
 	pkgs := map[string]map[string]struct{}{}
 	for _, path := range paths {
@@ -98,39 +126,74 @@ func listPackages(paths []string) (map[string]map[string]struct{}, error) {
 	return pkgs, nil
 }
 
-func process(paths []string, mkdir func(string, os.FileMode) error, write func(string, []byte, os.FileMode) error) error {
-	pkgMap, err := listPackages(paths)
-	if err != nil {
-		return err
+func loadConfig(paths []string) (*loader.Program, error) {
+	dirs := build.Default.SrcDirs()
+	getPackage := func(p string) string {
+		d := filepath.Dir(p)
+		for _, dir := range dirs {
+			if strings.HasPrefix(d, dir) {
+				return strings.TrimPrefix(d, dir)[1:]
+			}
+		}
+		return ""
+	}
+
+	f, m := []string{}, map[string]bool{}
+
+	if len(paths) == 0 {
+		f = append(f, ".")
 	}
 	cfg := makeConfig()
-	for pkg, _ := range pkgMap {
-		cfg.Import(pkg)
+	for _, p := range paths {
+		if strings.HasSuffix(p, ".go") {
+			pkg := getPackage(p)
+			if pkg == "" {
+				continue
+			}
+			cfg.Import(pkg)
+			continue
+		}
+		if !m[p] {
+			f, m[p] = append(f, p), true
+		}
+	}
+
+	if len(f) > 0 {
+		if _, err := cfg.FromArgs(f, true); err != nil {
+			return nil, errors.WithStack(err)
+		}
 	}
 	p, err := cfg.Load()
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
+	}
+	return p, nil
+}
+
+func process(paths []string) ([]file, error) {
+
+	//pkgMap, err := listPackages(paths)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//cfg := makeConfig()
+	//for pkg, _ := range pkgMap {
+	//	cfg.Import(pkg)
+	//}
+	p, err := loadConfig(paths)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 	pkgs := p.InitialPackages()
 
 	var files []file
 	filer := func(f file) { files = append(files, f) }
 	for _, pkg := range pkgs {
-		if err := processPackage(pkg, filer, pkgMap[pkg.Pkg.Path()], getVendor(p, pkg)); err != nil {
-			return err
+		if err := processPackage(pkg, filer, getVendor(p, pkg)); err != nil {
+			return nil, err
 		}
 	}
-
-	for _, f := range files {
-		dir := filepath.Dir(f.path)
-		if err := mkdir(dir, 0755); err != nil {
-			return errors.WithStack(err)
-		}
-		if err := write(f.path, f.data, 0644); err != nil {
-			return errors.WithStack(err)
-		}
-	}
-	return doImports(paths)
+	return files, nil
 }
 
 func doImports(paths []string) error {
@@ -195,7 +258,7 @@ func getVendor(p *loader.Program, pkg *loader.PackageInfo) string {
 	return filepath.Join(base, "vendor")
 }
 
-func processPackage(pkg *loader.PackageInfo, add func(file), files map[string]struct{}, vendor string) error {
+func processPackage(pkg *loader.PackageInfo, add func(file), vendor string) error {
 	pos := posMap{}
 	for _, err := range pkg.Errors {
 		if terr, ok := err.(types.Error); ok && strings.Contains(terr.Error(), "could not import") {
@@ -204,9 +267,7 @@ func processPackage(pkg *loader.PackageInfo, add func(file), files map[string]st
 	}
 
 	for _, f := range pkg.Files {
-		if _, ok := files[f.Name.Name+".go"]; ok || len(files) == 0 {
-			ast.Walk(pos, f)
-		}
+		ast.Walk(pos, f)
 	}
 
 	for _, str := range pos {
