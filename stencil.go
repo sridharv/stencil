@@ -1,3 +1,4 @@
+// Package stencil generates specialized versions of Go packages by replacing types.
 package stencil
 
 import (
@@ -58,7 +59,10 @@ func makeConfig() *loader.Config {
 	}
 }
 
-// Process process paths, generating vendored, specialized code for any stencil import paths
+// Process process paths, generating vendored, specialized code for any stencil import paths.
+// If format is true any go files in paths are processed using goimports.
+//
+// For detailed documentation consult the docs for "github.com/sridharv/stencil/cmd/stencil"
 func Process(paths []string, format bool) error {
 	files, err := process(paths)
 	if err != nil {
