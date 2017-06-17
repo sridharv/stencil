@@ -14,6 +14,14 @@ import (
 
 	"strings"
 
+	"go/ast"
+	"go/parser"
+	"go/token"
+
+	"josharian/apply"
+
+	"go/printer"
+
 	"github.com/pkg/errors"
 	"github.com/sridharv/fakegopath"
 )
@@ -92,6 +100,34 @@ var cases = []testCase{
 		},
 	},
 	{
+		name: "Basic_Float32_SingleFile",
+		files: []fakegopath.SourceFile{
+			{Src: "testdata/basic.go", Dest: "basic/basic.go"},
+			{Src: "testdata/basic.use.go", Dest: "use/use.go"},
+		},
+		srcs: []string{"use/use.go"},
+		outs: []outFile{
+			{
+				path:   "use/vendor/basic/int/float32/basic.go",
+				golden: "testdata/basic.float32.golden",
+			},
+		},
+	},
+	{
+		name: "Set_Interfaces_SingleFile",
+		files: []fakegopath.SourceFile{
+			{Src: "testdata/interfaces.go", Dest: "ifaces/interfaces.go"},
+			{Src: "testdata/interfaces.use.go", Dest: "use/use.go"},
+		},
+		srcs: []string{"use/use.go"},
+		outs: []outFile{
+			{
+				path:   "use/vendor/ifaces/interface/int/ifaces.go",
+				golden: "testdata/interfaces.int.golden",
+			},
+		},
+	},
+	{
 		name: "Set_String_Dir",
 		files: []fakegopath.SourceFile{
 			{Src: "testdata/set.go", Dest: "collections/set/set.go"},
@@ -123,4 +159,32 @@ func TestStencil(t *testing.T) {
 	for _, c := range cases {
 		c.run(t)
 	}
+}
+
+func TestASTRewrite(t *testing.T) {
+	fs := token.NewFileSet()
+	f, err := parser.ParseFile(fs, "./testdata/set.go", nil, parser.AllErrors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := apply.Apply(f, func(c apply.ApplyCursor) bool {
+		switch t := c.Node().(type) {
+		case *ast.GenDecl:
+			if len(t.Specs) == 0 {
+				return true
+			}
+			spec, ok := t.Specs[0].(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+
+			if spec.Name.Name != "Element" {
+				return true
+			}
+			c.Delete()
+		}
+		return true
+	}, nil)
+	c := &printer.Config{}
+	c.Fprint(os.Stdout, fs, r)
 }

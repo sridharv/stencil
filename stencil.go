@@ -19,6 +19,8 @@ import (
 
 	"go/build"
 
+	"josharian/apply"
+
 	"github.com/pkg/errors"
 	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/go/vcs"
@@ -170,23 +172,40 @@ func doImports(paths []string) error {
 
 type replacer map[string]string
 
-func (r replacer) Visit(node ast.Node) (w ast.Visitor) {
-	if node == nil {
-		return nil
-	}
-	switch t := node.(type) {
+func (r replacer) preReplace(c apply.ApplyCursor) bool {
+	switch t := c.Node().(type) {
+	case *ast.GenDecl:
+		// Delete named type specifications that will be replaced.
+		if len(t.Specs) == 0 {
+			return true
+		}
+		spec, ok := t.Specs[0].(*ast.TypeSpec)
+		if !ok {
+			return true
+		}
+
+		if _, ok = r[spec.Name.Name]; !ok {
+			return true
+		}
+		c.Delete()
 	case *ast.Ident:
 		if s, ok := r[t.Name]; ok {
 			t.Name = s
 		}
-
+	case *ast.InterfaceType:
+		rep, ok := r["interface"]
+		if !ok {
+			return true
+		}
+		if _, isType := c.Parent().(*ast.TypeSpec); isType {
+			return true
+		}
+		c.Replace(&ast.Ident{
+			Name:    rep,
+			NamePos: t.Pos(),
+		})
 	}
-	return r
-}
-
-func (r replacer) filterTypeDecls(name string) bool {
-	_, present := r[name]
-	return !present
+	return true
 }
 
 func getVendor(p *loader.Program, pkg *loader.PackageInfo) string {
@@ -266,12 +285,7 @@ func substituteIfNeeded(base, path string, add func(file)) error {
 	root := filepath.Join(append([]string{base}, strings.Split(path, "/")...)...)
 	for _, f := range origin.InitialPackages()[0].Files {
 		target := filepath.Join(root, f.Name.Name+".go")
-		// Remove type declaration for types being replaced
-		if !ast.FilterFile(f, r.filterTypeDecls) {
-			continue
-		}
-		// Rename types
-		ast.Walk(r, f)
+		apply.Apply(f, r.preReplace, nil)
 		var b bytes.Buffer
 		if err := pcfg.Fprint(&b, origin.Fset, f); err != nil {
 			return errors.Errorf("%s: code generation failed", f.Name)
