@@ -1,5 +1,9 @@
 package ifaces
 
+type holder struct {
+	data int
+}
+
 type Set map[int]struct{}
 
 func (s Set) Add(a int) {

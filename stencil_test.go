@@ -14,13 +14,7 @@ import (
 
 	"strings"
 
-	"go/ast"
-	"go/parser"
-	"go/token"
-
-	"josharian/apply"
-
-	"go/printer"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sridharv/fakegopath"
@@ -55,11 +49,14 @@ func (c testCase) run(t *testing.T) {
 		}
 		proc := c.process
 		if proc == nil {
-			proc = process
+			proc = processStencil
 		}
 		files, err := proc(srcs)
 		if err != nil {
 			t.Fatalf("%+v", err)
+		}
+		if len(c.outs) != len(files) {
+			t.Fatalf("expected %d files, got %d", len(c.outs), len(files))
 		}
 		for i, o := range c.outs {
 			out := filepath.Join(tmp.Src, o.path)
@@ -122,8 +119,27 @@ var cases = []testCase{
 		srcs: []string{"use/use.go"},
 		outs: []outFile{
 			{
-				path:   "use/vendor/ifaces/interface/int/ifaces.go",
+				path:   "use/vendor/ifaces/interface/int/interfaces.go",
 				golden: "testdata/interfaces.int.golden",
+			},
+		},
+	},
+	{
+		name: "Set_Interfaces_MultiFile",
+		files: []fakegopath.SourceFile{
+			{Src: "testdata/interfaces.go", Dest: "ifaces/interfaces.go"},
+			{Src: "testdata/interfacesintersect.go", Dest: "ifaces/interfacesintersect.go"},
+			{Src: "testdata/interfaces.use.go", Dest: "use/use.go"},
+		},
+		srcs: []string{"use/use.go"},
+		outs: []outFile{
+			{
+				path:   "use/vendor/ifaces/interface/int/interfaces.go",
+				golden: "testdata/interfaces.int.golden",
+			},
+			{
+				path:   "use/vendor/ifaces/interface/int/interfacesintersect.go",
+				golden: "testdata/interfacesintersect.int.golden",
 			},
 		},
 	},
@@ -150,7 +166,7 @@ var cases = []testCase{
 				return nil, errors.WithStack(err)
 			}
 			defer os.Chdir(cwd)
-			return process([]string{})
+			return processStencil([]string{})
 		},
 	},
 }
@@ -161,30 +177,20 @@ func TestStencil(t *testing.T) {
 	}
 }
 
-func TestASTRewrite(t *testing.T) {
-	fs := token.NewFileSet()
-	f, err := parser.ParseFile(fs, "./testdata/set.go", nil, parser.AllErrors)
+func TestNewStencil(t *testing.T) {
+	tmp, err := fakegopath.NewTemporaryWithFiles("stencil_new", cases[3].files)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
-	r := apply.Apply(f, func(c apply.ApplyCursor) bool {
-		switch t := c.Node().(type) {
-		case *ast.GenDecl:
-			if len(t.Specs) == 0 {
-				return true
-			}
-			spec, ok := t.Specs[0].(*ast.TypeSpec)
-			if !ok {
-				return true
-			}
-
-			if spec.Name.Name != "Element" {
-				return true
-			}
-			c.Delete()
-		}
-		return true
-	}, nil)
-	c := &printer.Config{}
-	c.Fprint(os.Stdout, fs, r)
+	defer tmp.Reset()
+	files, err := processStencil([]string{filepath.Join(tmp.Src, "use/use.go")})
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+	for _, f := range files {
+		fmt.Println("\n", f.path)
+		fmt.Println("<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>")
+		fmt.Println(string(f.data))
+		fmt.Println("\n")
+	}
 }

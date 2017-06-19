@@ -1,6 +1,8 @@
 package use
 
 import (
+	_ "bytes"
+	_ "fmt"
 	int_set "ifaces/interface/int"
 )
 

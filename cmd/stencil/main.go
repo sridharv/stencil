@@ -7,7 +7,6 @@
 //
 // As a trivial example, consider a package "github.com/sridharv/stencil/std/num" with a function Max that computes the maximum value of a list of numbers.
 //
-//
 //	func Max(v...int) int {
 //		// compute max
 //	}
@@ -15,13 +14,14 @@
 // This only works for int, but we need a version of Max that works on float32.
 // stencil can automatically generate an float32 version by reading an import path with the substitution.
 //
-// Import the float32 version
+// Import the float32 version with a go generate directive
 //
-//	import (
-//		float32_num "github.com/sridharv/stencil/std/num/int/float32"
-//	)
+//  //go:generate stencil
+//  import (
+//  	float32_num "github.com/sridharv/stencil/std/num/int/float32"
+//  )
 //
-// int is substituted with float32 and a "stencilled" version of the package is generated. You can now use it in your code
+// On running go generate, int is substituted with float32 and a "stencilled" version of the package is generated. You can now use it in your code
 //
 //	func PrintMax(values []float32) {
 //		fmt.Println("Max of", values, "=", float32_num.Max(values...))
@@ -49,7 +49,7 @@
 //
 //	go generate
 //
-// in the package directory.
+// in the package directory. You only need one go generate directive per package.
 //
 //Generate on save
 //
