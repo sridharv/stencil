@@ -14,8 +14,6 @@ import (
 
 	"strings"
 
-	"fmt"
-
 	"github.com/pkg/errors"
 	"github.com/sridharv/fakegopath"
 )
@@ -174,23 +172,5 @@ var cases = []testCase{
 func TestStencil(t *testing.T) {
 	for _, c := range cases {
 		c.run(t)
-	}
-}
-
-func TestNewStencil(t *testing.T) {
-	tmp, err := fakegopath.NewTemporaryWithFiles("stencil_new", cases[3].files)
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
-	defer tmp.Reset()
-	files, err := processStencil([]string{filepath.Join(tmp.Src, "use/use.go")})
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
-	for _, f := range files {
-		fmt.Println("\n", f.path)
-		fmt.Println("<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>")
-		fmt.Println(string(f.data))
-		fmt.Println("\n")
 	}
 }
