@@ -14,15 +14,13 @@
 // This only works for int, but we need a version of Max that works on float32.
 // stencil can automatically generate an float32 version by reading an import path with the substitution.
 //
-// Import the float32 version with a go generate directive
+// Import the float32 version
 //
-//  //go:generate stencil
 //  import (
 //  	float32_num "github.com/sridharv/stencil/std/num/int/float32"
 //  )
 //
-// On running go generate, int is substituted with float32 and a "stencilled" version of the package is generated. You can now use it in your code
-//
+// and use it in your code
 //	func PrintMax(values []float32) {
 //		fmt.Println("Max of", values, "=", float32_num.Max(values...))
 //	}
@@ -31,13 +29,21 @@
 //
 //	stencil
 //
+// This generates a "stencilled" version of the package having int substituted with float32. You can now use it in your code
 // If your repo has a vendor directory, this will generate the float32 stencilled version in that vendor directory.
 // If not, a vendor directory will be created in your package directory and the stencilled version is generated there.
 //
 //Supported Types
 //
-// Any type in a package can be replaced. However, the substituted type must result in a package that compiles.
-// If you replace an interface with a specific named type, that named type must have the methods of the interface.
+// The set of types that can be replaced are currently restricted to the following:
+//
+//	* Named types in the stencil
+//	* Boolean types
+//	* Numeric types
+//	* String types
+//	* interface{} - Use interface in the import path
+//
+// These types can be replaced with the same set of types as above, with the exception of interface{}.
 //
 //With go generate
 //
@@ -57,9 +63,7 @@
 // Running
 // 	stencil -w <path/to/file>
 // will also run goimports on your code, while generating any needed stencilled packages.
-// You can add this as a separate command to run on save in your editor or replace the goimports binary with stencil.
-// Prefer adding a command to your editor. Replacing the goimports binary is hacky since stencil doesnt support all command line flags of goimports.
-//
+// You can add this as a separate command to run on save in your editor.
 // NOTE: The current version of stencil is slower than goimports and so you may still prefer to use `go generate`.
 package main
 
