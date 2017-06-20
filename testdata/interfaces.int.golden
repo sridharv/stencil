@@ -4,6 +4,11 @@ type holder struct {
 	data int
 }
 
+type orderedPair struct {
+	first  int
+	second int
+}
+
 type Set map[int]struct{}
 
 func (s Set) Add(a int) {

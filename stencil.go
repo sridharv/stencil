@@ -3,12 +3,12 @@ package stencil
 
 import (
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"strings"
 
 	"bytes"
-	"go/printer"
 
 	"path/filepath"
 
@@ -196,12 +196,11 @@ func makeStencilled(stencil, stencilled string, r replacer, res *[]file) error {
 		files = p.Files
 		break
 	}
-	var pcfg printer.Config
 	for path, f := range files {
 		target := filepath.Join(stencilled, filepath.Base(path))
 		apply.Apply(f, r.preReplace, nil)
 		var b bytes.Buffer
-		if err := pcfg.Fprint(&b, fs, f); err != nil {
+		if err := format.Node(&b, fs, f); err != nil {
 			return errors.Errorf("%s:%s: code generation failed", stencil, f.Name)
 		}
 		out, err := imports.Process(target, b.Bytes(), nil)
