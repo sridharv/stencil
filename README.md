@@ -1,9 +1,11 @@
 # Stencil - Simple code templating for Go
 
 Stencil generates specialized versions of Go packages by replacing types.
+This is a prototype of [this proposal](https://www.laddoo.net/p/stencil). It will have bugs and only supports
+a subset of the features in the proposal.
 
 Given a package with an interface `A`, stencil can generate a new package with all uses of `A` replaced by `int` (or any other type).
-The generated package is stored in the topmost vendor directory of the repo. If no such directory exists, one is created.
+The generated package is stored in the closest vendor directory of the repo. If no such directory exists, one is created.
 
 ## Installation
 
@@ -23,9 +25,16 @@ go install github.com/sridharv/stencil/cmd/stencil
 
 Please consult the documentation at [![GoDoc](https://godoc.org/github.com/sridharv/stencil/cmd/stencil?status.svg)](https://godoc.org/github.com/sridharv/stencil/cmd/stencil) 
 
+## Libraries
+
+A few useful packages that lend themselves to being used with `stencil`.
+
+ * `github.com/sridharv/stencil/std/num` - Max, Min and Sum for numbers. [![GoDoc](https://godoc.org/github.com/sridharv/stencil/std/num?status.svg)](https://godoc.org/github.com/sridharv/stencil/std/num)
+ * `github.com/sridharv/stencil/std/slice` - Slice utilities. [![GoDoc](https://godoc.org/github.com/sridharv/stencil/std/slice?status.svg)](https://godoc.org/github.com/sridharv/stencil/std/slice)
+
 ## License
 
-Lint is available under the Apache License. See the LICENSE file for details.
+Stencil is available under the Apache License. See the LICENSE file for details.
 
 ### Contributing
 
