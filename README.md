@@ -23,7 +23,63 @@ go install github.com/sridharv/stencil/cmd/stencil
 
 ## Usage
 
-Please consult the documentation at [![GoDoc](https://godoc.org/github.com/sridharv/stencil/cmd/stencil?status.svg)](https://godoc.org/github.com/sridharv/stencil/cmd/stencil) 
+Detailed documentation is at [![GoDoc](https://godoc.org/github.com/sridharv/stencil/cmd/stencil?status.svg)](https://godoc.org/github.com/sridharv/stencil/cmd/stencil) 
+
+### Example Walkthrough
+
+Install stencil as shown above. Then create a package to act as a stencil. Let's create a generic Sum method.
+
+Create `$GOPATH/src/example/stencil/math/math.go` (or a package of your choice) containing
+
+```
+package math
+
+func Sum(n...float64) float64 {
+    var r float64
+    for _, v := range n {
+        r += v
+    }
+    return r
+}
+```
+
+Now use it to compute the sum of `int`s by using `stencil` to replace `float64` with `int`.
+
+Create `$GOPATH/src/example/usestencil/main.go` (or another package of your choice) containing
+
+```
+package main
+
+//go:generate stencil
+import (
+    "fmt"
+    int_math "example/stencil/math/float64/int"
+)
+
+// PrintIntSum prints the sum of all elements of v to stdout.
+func main() {
+    ints := []int{1, 2, 3, 4, 5}
+    fmt.Println("Sum of", v, "=", int_math.Sum(ints...))
+}
+```
+
+Now run
+
+```
+ # Or the path to the main package you created
+ cd $GOPATH/src/example/usestencil/ 
+```
+and then
+```
+go generate
+```
+
+Take a look at `$GOPATH/src/example/usestencil/`. It will have a vendor directory with a specialised version of
+`example/stencil/math`. You can now build and run the example with
+
+```
+go run main.go
+```
 
 ## Libraries
 
