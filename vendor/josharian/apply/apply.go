@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Source: https://gist.github.com/josharian/78760cea426d7f104c7c55f0b3c037d1
+
 package apply
 
 import (
