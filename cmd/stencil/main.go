@@ -64,7 +64,6 @@
 // 	stencil -w <path/to/file>
 // will also run goimports on your code, while generating any needed stencilled packages.
 // You can add this as a separate command to run on save in your editor.
-// NOTE: The current version of stencil is slower than goimports and so you may still prefer to use `go generate`.
 package main
 
 import (
